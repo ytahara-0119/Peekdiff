@@ -3,6 +3,7 @@ import { Search, FolderOpen, GitCompare } from 'lucide-react';
 import { FileNode, CompareStatus } from './types';
 import { DirectoryTree } from './components/DirectoryTree';
 import { FileDetailView } from './components/FileDetailView';
+import { AppIcon } from './components/AppIcon';
 import { compareDirectories, openFolderDialog } from './utils/tauriApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -129,7 +130,10 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur-lg px-4 py-3 flex flex-col gap-2">
         {/* Title */}
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 flex-shrink-0">
+            <AppIcon size={40} />
+          </div>
           <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Peekdiff
           </span>
