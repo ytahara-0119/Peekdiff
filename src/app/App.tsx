@@ -48,9 +48,9 @@ function triggerCelebration() {
     const timeLeft = animationEnd - Date.now();
     if (timeLeft <= 0) return clearInterval(interval);
     const particleCount = 50 * (timeLeft / duration);
-    confetti({ ...defaults, particleCount, origin: { x: rand(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'] });
-    confetti({ ...defaults, particleCount, origin: { x: rand(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'] });
-    confetti({ ...defaults, particleCount: particleCount / 2, origin: { x: 0.5, y: 0.5 }, colors: ['#FFD700', '#FF69B4', '#87CEEB'], shapes: ['star' as const], scalar: 1.5, gravity: 0.5 });
+    confetti({ ...defaults, particleCount, origin: { x: rand(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'], shapes: ['circle', 'square'], scalar: rand(0.8, 1.2) });
+    confetti({ ...defaults, particleCount, origin: { x: rand(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'], shapes: ['circle', 'square'], scalar: rand(0.8, 1.2) });
+    confetti({ ...defaults, particleCount: particleCount / 2, origin: { x: 0.5, y: 0.5 }, colors: ['#FFD700', '#FF69B4', '#87CEEB', '#FFB6C1'], shapes: ['star' as const], scalar: 1.5, gravity: 0.5 });
   }, 250);
 }
 
@@ -141,14 +141,15 @@ export default function App() {
       const result = await compareDirectories(leftPath, rightPath);
       setTree(result);
       setProgress(100);
-    } catch (e) {
-      setError(String(e));
-    } finally {
       clearInterval(interval);
-      setTimeout(() => {
-        setIsComparing(false);
-        setProgress(0);
-      }, 300);
+      // isComparing=false を先に更新し、progress=100 のまま confetti を発火させる
+      setTimeout(() => setIsComparing(false), 300);
+      setTimeout(() => setProgress(0), 800);
+    } catch (e) {
+      clearInterval(interval);
+      setError(String(e));
+      setIsComparing(false);
+      setProgress(0);
     }
   }
 
