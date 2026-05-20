@@ -134,8 +134,12 @@ export default function App() {
         } else if (type === 'drop') {
           if (event.payload.paths.length > 0) {
             const path = event.payload.paths[0];
-            if (dragSideRef.current === 'left') setLeftPath(path);
-            else if (dragSideRef.current === 'right') setRightPath(path);
+            // position.x を直接使用: leave が drop より先に発火して ref がクリアされる
+            // macOS 固有の問題を回避するため dragSideRef には依存しない
+            const midX = (window.innerWidth / 2) * window.devicePixelRatio;
+            const side: 'left' | 'right' = event.payload.position.x < midX ? 'left' : 'right';
+            if (side === 'left') setLeftPath(path);
+            else setRightPath(path);
           }
           setDragOverSide(null);
           dragSideRef.current = null;
