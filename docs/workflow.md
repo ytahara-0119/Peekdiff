@@ -4,14 +4,13 @@
 
 | Issue | タイトル | 依存 | 並列グループ | 状態 |
 |-------|---------|------|------------|------|
-| issue01 | 環境構築（package.json / tsconfig.json） | なし | Group 1 | 完了 |
-| issue02 | gitService.ts — git コマンド共通層 | issue01 | Group 2 | 完了 |
-| issue03 | sidebarProvider.ts — サイドバー TreeView | issue02 | Group 3 | 完了 |
-| issue04 | blameDecoration.ts — Blame ゴーストテキスト | issue02 | Group 3 | 完了 |
-| issue05 | historyPanel.ts — コミット履歴 + ファイル一覧 | issue02 | Group 3 | 完了 |
-| issue06 | historyPanel.ts — ファイル履歴 + diff | issue05 | Group 4 | 完了 |
-| issue07 | extension.ts 統合 + .vsix パッケージ化 | issue03, issue04, issue06 | Group 5 | 完了 |
-| issue08 | UX 改善 — インライン split diff + キーボードナビ + 構文ハイライト | issue06 | Group 6 | 完了 |
+| issue01 | 環境構築（Vite + React + TS + Tailwind + shadcn/ui + Tauri） | なし | Group 1 | 未着手 |
+| issue02 | 型定義・モックデータ（types.ts / mockData.ts） | issue01 | Group 2 | 未着手 |
+| issue03 | DirectoryTree コンポーネント | issue02 | Group 3 | 未着手 |
+| issue04 | FileDetailView コンポーネント（TextDiffView + BinaryFileView） | issue02 | Group 3 | 未着手 |
+| issue05 | App 統合（ヘッダー・比較ボタン・検索・フィルタ・統計バッジ） | issue03, issue04 | Group 4 | 未着手 |
+| issue06 | Tauri IPC 連携（実フォルダ走査・差分計算・モック差し替え） | issue05 | Group 5 | 未着手 |
+| issue07 | .app パッケージ化・動作確認 | issue06 | Group 6 | 未着手 |
 
 ---
 
@@ -20,21 +19,16 @@
 ```
 Group 1: issue01  （環境構築）
     ↓
-Group 2: issue02  （gitService.ts）
+Group 2: issue02  （型定義・モックデータ）
     ↓
 Group 3: issue03 ┐
-         issue04 ├── 並列実行可（Editable Files が重複しない）
-         issue05 ┘
+         issue04 ┘ 並列実行可（Editable Files が重複しない）
     ↓
-Group 4: issue06  （historyPanel.ts に追記、issue05と同ファイルのため逐次）
+Group 4: issue05  （App 統合）
     ↓
-Group 5: issue07  （extension.ts 統合 + vsix）
+Group 5: issue06  （Tauri IPC 連携）
     ↓
-Group 6: issue08  （UX 改善 — インライン diff + キーボードナビ + 構文ハイライト）
-    ↓
-[UX レビュー] → UX Reviewer が問題を洗い出し、改善 issue を起票
-    ↓
-Group N: UX 改善 issue（複数）
+Group 6: issue07  （パッケージ化・動作確認）
 ```
 
 ---
@@ -44,11 +38,11 @@ Group N: UX 改善 issue（複数）
 ```
 issue01
   └── issue02
-        ├── issue03 ─────────────────────────────┐
-        ├── issue04 ─────────────────────────────┤
-        └── issue05                              │
-              └── issue06                        │
-                    └── issue07 ◄────────────────┘
+        ├── issue03 ──┐
+        └── issue04 ──┤
+                      └── issue05
+                            └── issue06
+                                  └── issue07
 ```
 
 ---
@@ -66,44 +60,17 @@ issue01
 
 ---
 
-## UX レビューフロー
-
-実装 Group 完了時など UI 変更があったタイミングで UX Reviewer を起動し、改善 issue を起票する。
-**UX Reviewer の詳細な責務・観点・出力フォーマット・実行フローは [`agents/ux-reviewer.md`](../agents/ux-reviewer.md) を正本とする。**
-
-### 起動タイミング
-
-- 新しい UI が追加されたとき（Webview, TreeView, 通知など）
-- UX に関わる issue が完了したとき
-- 人間が「UX レビューして」と指示したとき
-
-### 起動方法（Supervisor から）
-
-```
-Agent(
-  subagent_type = "general-purpose",
-  prompt = """
-    agents/ux-reviewer.md の指示に従い、現在の実装を UX レビューしてください。
-    レビュー結果は「問題 / なぜ問題か / 改善案 / 優先度」の形式で報告し、
-    High 優先度の問題は issues/uxNN.md として起票してください。
-  """
-)
-```
-
----
-
 ## ブランチ命名
 
 | Issue | ブランチ名 |
 |-------|-----------|
 | issue01 | feature/issue01-env-setup |
-| issue02 | feature/issue02-git-service |
-| issue03 | feature/issue03-sidebar-provider |
-| issue04 | feature/issue04-blame-decoration |
-| issue05 | feature/issue05-history-panel-basic |
-| issue06 | feature/issue06-history-panel-diff |
-| issue07 | feature/issue07-extension-entry-vsix |
-| ux改善 | feature/ux-<概要> |
+| issue02 | feature/issue02-types-mock |
+| issue03 | feature/issue03-directory-tree |
+| issue04 | feature/issue04-file-detail-view |
+| issue05 | feature/issue05-app-integration |
+| issue06 | feature/issue06-tauri-ipc |
+| issue07 | feature/issue07-packaging |
 
 ---
 
@@ -121,7 +88,7 @@ Agent(
 ## issue 分割ルール
 
 - 1 issue = 1責務
-- 原則 1〜2ファイルのみ変更
+- 原則 1〜3 ファイルのみ変更
 - 横断変更は禁止
 
 ---
@@ -137,9 +104,8 @@ Agent(
 
 | 役割 | 定義ファイル | 責務 |
 |------|------------|------|
-| Supervisor | [`agents/supervisor.md`](../agents/supervisor.md) | issue 分割・依存整理・Implementer / UX Reviewer の起動・人間確認 |
+| Supervisor | [`agents/supervisor.md`](../agents/supervisor.md) | issue 分割・依存整理・Implementer 起動・人間確認 |
 | Implementer | [`agents/implementer.md`](../agents/implementer.md) | 指定 issue の実装・PR 作成 |
-| UX Reviewer | [`agents/ux-reviewer.md`](../agents/ux-reviewer.md) | 実装の UX 評価・改善 issue の起票 |
 
 ---
 
