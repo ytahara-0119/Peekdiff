@@ -82,6 +82,7 @@ issue01
 - **PR 作成前に Acceptance Criteria / Definition of Done の全項目を確認する**
 - 未完了項目がある場合は PR を作成しない
 - 次の issue に着手する前に依存 issue の PR が main にマージ済みであること
+- **ブランチは必ず最新 main から作成する**（古い main を起点にすると、前 issue の修正が含まれず再バグが発生する）
 
 ---
 
@@ -97,6 +98,8 @@ issue01
 
 - 同一ファイルを複数 issue で編集しない
 - 共通変更は最後にまとめる
+- **やむを得ず同一ファイルを複数 issue で触る場合は、1 本マージ完了 → 最新 main から次ブランチ作成 の順序を厳守する**
+  - 例：issue11/12/13 がすべて `App.tsx` を触った際、マージ順序のズレで import が消えホットフィックス（issue14）が必要になった
 
 ---
 
@@ -114,3 +117,17 @@ issue01
 - issue 完了時の確認のみ行う
 - 設計の方向修正を行う
 - バグ・仕様ズレの最終判断を行う
+
+---
+
+## プラットフォーム固有 API の取り扱い
+
+Tauri / OS 固有の API を使う issue では、実装前に以下を確認する：
+
+- **座標系**: イベントの `position.x` が物理ピクセル（PhysicalPosition）か論理ピクセル（CSS px）か
+  - 例：Tauri v2 の `onDragDropEvent` の `position.x` は論理ピクセル。`* devicePixelRatio` は不要（issue19 で判明）
+- **イベント発火順序**: OS によって順序が異なる場合がある
+  - 例：macOS では `leave` が `drop` より先に発火することがある（issue17/19 で判明）
+- **HTML イベントの制限**: OS レベルのファイルドラッグは WebView の HTML drag イベント（`ondragenter` 等）が発火しない
+  - 例：Finder → Tauri WebView の D&D は `onDragDropEvent` のみ使用可（issue15 で判明）
+- 公式ドキュメント・GitHub Issues で既知の挙動を事前確認してから issue を設計する
