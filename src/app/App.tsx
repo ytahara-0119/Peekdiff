@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Search, FolderOpen, GitCompare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, FolderOpen, GitCompare, Moon, Star, Filter } from 'lucide-react';
+import { motion } from 'motion/react';
+import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
 import { DirectoryTree } from './components/DirectoryTree';
 import { FileDetailView } from './components/FileDetailView';
@@ -36,13 +38,32 @@ function filterFileTree(
   return nodes.map(filterNode).filter(Boolean) as FileNode[];
 }
 
+function triggerCelebration() {
+  const duration = 3000;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+  const rand = (min: number, max: number) => Math.random() * (max - min) + min;
+
+  const interval = setInterval(() => {
+    const timeLeft = animationEnd - Date.now();
+    if (timeLeft <= 0) return clearInterval(interval);
+    const particleCount = 50 * (timeLeft / duration);
+    confetti({ ...defaults, particleCount, origin: { x: rand(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'] });
+    confetti({ ...defaults, particleCount, origin: { x: rand(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#9333EA', '#EC4899', '#3B82F6', '#F59E0B', '#10B981'] });
+    confetti({ ...defaults, particleCount: particleCount / 2, origin: { x: 0.5, y: 0.5 }, colors: ['#FFD700', '#FF69B4', '#87CEEB'], shapes: ['star' as const], scalar: 1.5, gravity: 0.5 });
+  }, 250);
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatBadge({ label, count, gradient }: { label: string; count: number; gradient: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r ${gradient}`}>
+    <motion.span
+      whileHover={{ scale: 1.05 }}
+      className={`inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r shadow-md ${gradient}`}
+    >
       {label}{count}
-    </span>
+    </motion.span>
   );
 }
 
@@ -52,16 +73,17 @@ interface FolderInputProps {
   onChange: (v: string) => void;
   gradient: string;
   iconColor: string;
+  borderColor: string;
 }
 
-function FolderInput({ label, value, onChange, gradient, iconColor }: FolderInputProps) {
+function FolderInput({ label, value, onChange, gradient, iconColor, borderColor }: FolderInputProps) {
   async function browse() {
     const path = await openFolderDialog();
     if (path) onChange(path);
   }
   return (
-    <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r ${gradient} border border-purple-100`}>
-      <FolderOpen size={15} className={`${iconColor} flex-shrink-0`} />
+    <div className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border ${borderColor} shadow-sm`}>
+      <FolderOpen size={18} className={`${iconColor} flex-shrink-0`} />
       <input
         className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400 min-w-0"
         placeholder={label}
@@ -70,7 +92,7 @@ function FolderInput({ label, value, onChange, gradient, iconColor }: FolderInpu
       />
       <button
         onClick={browse}
-        className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+        className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 px-2 py-0.5 rounded hover:bg-white/50"
         title="フォルダを選択"
       >
         選択
@@ -95,6 +117,13 @@ export default function App() {
   const stats = getComparisonStats(tree);
   const visibleTree = filterFileTree(tree, filterStatus, searchQuery);
 
+  // Confetti on comparison complete
+  useEffect(() => {
+    if (progress === 100 && !isComparing && tree.length > 0) {
+      triggerCelebration();
+    }
+  }, [progress, isComparing, tree.length]);
+
   async function handleCompare() {
     if (isComparing || !leftPath || !rightPath) return;
     setIsComparing(true);
@@ -102,7 +131,6 @@ export default function App() {
     setError(null);
     setSelectedFile(null);
 
-    // Progress animation while comparing
     let step = 0;
     const interval = setInterval(() => {
       step = Math.min(step + 1, 9);
@@ -127,9 +155,13 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       {/* Header */}
-      <header className="border-b border-gray-200 bg-white/80 backdrop-blur-lg px-4 py-3 flex flex-col gap-2">
-        {/* Title */}
-        <div className="flex items-center gap-2 mb-1">
+      <header className="border-b border-purple-200/50 bg-white/80 backdrop-blur-lg px-6 py-4 flex flex-col gap-3">
+        {/* Title + icon widget */}
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Moon className="w-5 h-5 text-yellow-200 absolute" />
+            <Star className="w-3 h-3 text-yellow-300 absolute top-1 right-1 animate-pulse" />
+          </div>
           <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Peekdiff
           </span>
@@ -138,37 +170,40 @@ export default function App() {
         {/* Folder inputs + compare button */}
         <div className="flex items-center gap-3">
           <FolderInput
-            label="左フォルダ"
+            label="左側のフォルダパス"
             value={leftPath}
             onChange={setLeftPath}
             gradient="from-purple-50 to-pink-50"
-            iconColor="text-purple-400"
+            iconColor="text-purple-500"
+            borderColor="border-purple-200"
           />
           <FolderInput
-            label="右フォルダ"
+            label="右側のフォルダパス"
             value={rightPath}
             onChange={setRightPath}
             gradient="from-blue-50 to-cyan-50"
-            iconColor="text-blue-400"
+            iconColor="text-blue-500"
+            borderColor="border-blue-200"
           />
-          <button
+          <motion.button
             onClick={handleCompare}
             disabled={isComparing || !leftPath || !rightPath}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold shadow hover:opacity-90 disabled:opacity-40 transition-opacity flex-shrink-0"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
           >
-            <GitCompare size={15} />
-            比較
-          </button>
+            <GitCompare size={16} />
+            {isComparing ? `比較中... ${progress}%` : '比較'}
+          </motion.button>
         </div>
 
         {/* Progress bar */}
         {isComparing && (
-          <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-100"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: progress / 100 }}
+            className="h-1.5 w-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full origin-left"
+          />
         )}
 
         {/* Error */}
@@ -178,8 +213,8 @@ export default function App() {
 
         {/* Search + filter */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white">
-            <Search size={14} className="text-gray-400 flex-shrink-0" />
+          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
+            <Search size={16} className="text-purple-500 flex-shrink-0" />
             <input
               className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
               placeholder="ファイル名で検索..."
@@ -187,22 +222,25 @@ export default function App() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <select
-            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 outline-none"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as CompareStatus | 'all')}
-          >
-            <option value="all">すべて</option>
-            <option value="added">追加</option>
-            <option value="deleted">削除</option>
-            <option value="modified">変更</option>
-            <option value="identical">同一</option>
-          </select>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
+            <Filter size={16} className="text-purple-500 flex-shrink-0" />
+            <select
+              className="bg-transparent text-sm text-gray-700 outline-none cursor-pointer"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as CompareStatus | 'all')}
+            >
+              <option value="all">すべて</option>
+              <option value="added">追加</option>
+              <option value="deleted">削除</option>
+              <option value="modified">変更</option>
+              <option value="identical">同一</option>
+            </select>
+          </div>
         </div>
 
         {/* Stats badges */}
         {tree.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <StatBadge label="+" count={stats.added} gradient="from-green-500 to-emerald-500" />
             <StatBadge label="-" count={stats.deleted} gradient="from-red-500 to-rose-500" />
             <StatBadge label="~" count={stats.modified} gradient="from-yellow-500 to-amber-500" />
@@ -214,7 +252,11 @@ export default function App() {
       {/* Main content */}
       <div className="flex-1 flex gap-1 overflow-hidden p-1">
         {/* Left pane */}
-        <div className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-xl overflow-y-auto shadow-sm border border-white/60">
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-tr-2xl overflow-y-auto shadow-xl border-r border-purple-200/50"
+        >
           {tree.length === 0 && !isComparing ? (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
               左右のフォルダを選択して「比較」を押してください
@@ -226,12 +268,16 @@ export default function App() {
               selectedFile={selectedFile}
             />
           )}
-        </div>
+        </motion.div>
 
         {/* Right pane */}
-        <div className="flex-1 bg-white/50 backdrop-blur-lg rounded-xl overflow-hidden shadow-sm border border-white/60 flex flex-col">
+        <motion.div
+          initial={{ x: 20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="flex-1 bg-white/50 backdrop-blur-lg rounded-tl-2xl overflow-hidden shadow-xl flex flex-col"
+        >
           <FileDetailView file={selectedFile} />
-        </div>
+        </motion.div>
       </div>
     </div>
   );
