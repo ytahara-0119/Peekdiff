@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, FolderOpen, GitCompare, Filter } from 'lucide-react';
+import { Search, FolderOpen, GitCompare, Filter, Moon, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
