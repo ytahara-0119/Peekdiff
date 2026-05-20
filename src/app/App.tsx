@@ -295,7 +295,7 @@ export default function App() {
         <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-tr-2xl overflow-y-auto shadow-xl border-r border-purple-200/50"
+          className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-tr-2xl overflow-y-auto overflow-x-hidden shadow-xl border-r border-purple-200/50"
         >
           {tree.length === 0 && !isComparing ? (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
