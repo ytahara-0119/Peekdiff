@@ -45,9 +45,24 @@ src-tauri/target/release/bundle/dmg/Peekdiff_0.1.0_aarch64.dmg
 
 Finder で `Peekdiff.app` をダブルクリックして起動できます。
 
+## アイコンの更新
+
+Dock アイコンを更新するには再ビルドが必要です：
+
+```bash
+pnpm rebuild:icon
+```
+
+このコマンドは以下を自動で実行します：
+1. `AppIcon.svg` からアイコン再生成（`pnpm tauri icon`）
+2. リリースビルド（`pnpm tauri build`）
+3. macOS アイコンキャッシュのクリア
+
+その後 `src-tauri/target/release/bundle/macos/Peekdiff.app` を起動すると新しいアイコンが反映されます。
+
 ## 使い方
 
-1. 左右のフォルダ入力欄に「選択」ボタンでフォルダを指定する
+1. 左右のフォルダ入力欄に「選択」ボタンまたはFinderからD&Dでフォルダを指定する
 2. 「比較」ボタンを押す
 3. 左ペインにファイルツリーが表示される
 4. ファイルをクリックすると右ペインに差分詳細が表示される
