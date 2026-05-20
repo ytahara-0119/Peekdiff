@@ -127,15 +127,18 @@ export default function App() {
       getCurrentWebview().onDragDropEvent((event) => {
         const { type } = event.payload;
         if (type === 'enter' || type === 'over') {
-          const midX = (window.innerWidth / 2) * window.devicePixelRatio;
+          const midX = window.innerWidth / 2;
           const side: 'left' | 'right' = event.payload.position.x < midX ? 'left' : 'right';
           dragSideRef.current = side;
           setDragOverSide(side);
         } else if (type === 'drop') {
           if (event.payload.paths.length > 0) {
             const path = event.payload.paths[0];
-            if (dragSideRef.current === 'left') setLeftPath(path);
-            else if (dragSideRef.current === 'right') setRightPath(path);
+            // dragSideRef に依存せず position.x から直接判定（leave が drop より先に発火する macOS の挙動対策）
+            const midX = window.innerWidth / 2;
+            const side: 'left' | 'right' = event.payload.position.x < midX ? 'left' : 'right';
+            if (side === 'left') setLeftPath(path);
+            else setRightPath(path);
           }
           setDragOverSide(null);
           dragSideRef.current = null;
