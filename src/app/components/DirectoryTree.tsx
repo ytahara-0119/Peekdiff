@@ -12,29 +12,24 @@ interface DirectoryTreeProps {
 function statusStyle(status: CompareStatus): string {
   switch (status) {
     case 'added':
-      return 'bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500';
+      return 'bg-gradient-to-r from-green-100 to-emerald-100 border-l-4 border-green-500';
     case 'deleted':
-      return 'bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500';
+      return 'bg-gradient-to-r from-red-100 to-rose-100 border-l-4 border-red-500';
     case 'modified':
-      return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-yellow-500';
+      return 'bg-gradient-to-r from-yellow-100 to-amber-100 border-l-4 border-yellow-500';
     case 'identical':
       return 'hover:bg-purple-50';
   }
 }
 
-function StatusBadge({ status }: { status: CompareStatus }) {
-  if (status === 'identical') return null;
-  const map: Record<Exclude<CompareStatus, 'identical'>, { label: string; className: string }> = {
-    added: { label: 'A', className: 'bg-green-100 text-green-700' },
-    deleted: { label: 'D', className: 'bg-red-100 text-red-700' },
-    modified: { label: 'M', className: 'bg-yellow-100 text-yellow-700' },
-  };
-  const { label, className } = map[status as Exclude<CompareStatus, 'identical'>];
-  return (
-    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded ${className}`}>
-      {label}
-    </span>
-  );
+function iconColor(status: CompareStatus, isDir: boolean): string {
+  if (isDir) return 'text-purple-500';
+  switch (status) {
+    case 'added':    return 'text-emerald-500';
+    case 'deleted':  return 'text-red-500';
+    case 'modified': return 'text-amber-500';
+    case 'identical': return 'text-blue-400';
+  }
 }
 
 interface TreeNodeProps {
@@ -55,7 +50,9 @@ function TreeNode({ node, depth, onSelectFile, selectedFile }: TreeNodeProps) {
 
   return (
     <div>
-      <div
+      <motion.div
+        whileHover={{ x: 4 }}
+        whileTap={{ scale: 0.98 }}
         className={`${baseStyle} ${rowStyle}`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => {
@@ -70,14 +67,14 @@ function TreeNode({ node, depth, onSelectFile, selectedFile }: TreeNodeProps) {
           <motion.span
             animate={{ rotate: open ? 90 : 0 }}
             transition={{ duration: 0.15 }}
-            className="flex-shrink-0 text-gray-400"
+            className="flex-shrink-0 text-purple-400"
           >
             <ChevronRight size={14} />
           </motion.span>
         )}
         {!isDir && <span className="w-3.5 flex-shrink-0" />}
 
-        <span className="flex-shrink-0 text-gray-500">
+        <span className={`flex-shrink-0 ${iconColor(node.status, isDir)}`}>
           {isDir ? (
             open ? <FolderOpen size={15} /> : <Folder size={15} />
           ) : (
@@ -85,9 +82,10 @@ function TreeNode({ node, depth, onSelectFile, selectedFile }: TreeNodeProps) {
           )}
         </span>
 
-        <span className="truncate flex-1 text-gray-800">{node.name}</span>
-        <StatusBadge status={node.status} />
-      </div>
+        <span className={`truncate flex-1 text-gray-800 ${isDir ? 'font-semibold' : ''}`}>
+          {node.name}
+        </span>
+      </motion.div>
 
       {isDir && open && node.children && (
         <div>

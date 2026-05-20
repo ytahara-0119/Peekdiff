@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import { HardDrive, Hash, Calendar } from 'lucide-react';
 import { FileNode, DiffLine, CompareStatus } from '../types';
 
@@ -88,11 +89,11 @@ function TextDiffView({ file }: { file: FileNode }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="grid grid-cols-2 divide-x divide-gray-200">
-        <div className="bg-gradient-to-r from-purple-100 to-pink-100 px-4 py-2 text-xs font-semibold text-purple-700">
+      <div className="grid grid-cols-2 divide-x divide-purple-300">
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-xs font-semibold text-white">
           左側
         </div>
-        <div className="bg-gradient-to-r from-pink-100 to-purple-100 px-4 py-2 text-xs font-semibold text-pink-700">
+        <div className="bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2 text-xs font-semibold text-white">
           右側
         </div>
       </div>
@@ -103,7 +104,7 @@ function TextDiffView({ file }: { file: FileNode }) {
             {lines.map((line, i) => {
               const isDeleted = line.type === 'deleted';
               const isAdded = line.type === 'added';
-              const bg = isDeleted ? 'bg-red-50' : isAdded ? 'bg-gray-50' : 'hover:bg-gray-50';
+              const bg = isDeleted ? 'bg-red-200' : isAdded ? 'bg-gray-50' : 'hover:bg-gray-50';
               return (
                 <div key={i} className={`flex font-mono text-xs ${bg}`}>
                   <span className="min-w-[3rem] text-right text-gray-400 select-none pr-3 py-0.5 border-r border-gray-100">
@@ -121,7 +122,7 @@ function TextDiffView({ file }: { file: FileNode }) {
             {lines.map((line, i) => {
               const isAdded = line.type === 'added';
               const isDeleted = line.type === 'deleted';
-              const bg = isAdded ? 'bg-green-50' : isDeleted ? 'bg-gray-50' : 'hover:bg-gray-50';
+              const bg = isAdded ? 'bg-green-200' : isDeleted ? 'bg-gray-50' : 'hover:bg-gray-50';
               return (
                 <div key={i} className={`flex font-mono text-xs ${bg}`}>
                   <span className="min-w-[3rem] text-right text-gray-400 select-none pr-3 py-0.5 border-r border-gray-100">
@@ -144,25 +145,34 @@ function BinaryFileView({ file }: { file: FileNode }) {
   const sizeLabel = file.size != null ? `${(file.size / 1024).toFixed(1)} KB` : 'N/A';
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded text-sm text-gray-500">
+      <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-medium">
         バイナリファイルは差分表示できません
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-          <HardDrive size={20} className="text-gray-400" />
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <HardDrive size={20} className="text-purple-400" />
           <span className="text-xs text-gray-400 mt-1">ファイルサイズ</span>
           <span className="text-sm font-semibold text-gray-700">{sizeLabel}</span>
-        </div>
-        <div className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-          <Hash size={20} className="text-gray-400" />
+        </motion.div>
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <Hash size={20} className="text-pink-400" />
           <span className="text-xs text-gray-400 mt-1">ハッシュ値</span>
           <span className="text-sm font-mono text-gray-700 truncate w-full text-center">{file.hash ?? 'N/A'}</span>
-        </div>
-        <div className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-          <Calendar size={20} className="text-gray-400" />
+        </motion.div>
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="flex flex-col gap-1 items-center bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <Calendar size={20} className="text-blue-400" />
           <span className="text-xs text-gray-400 mt-1">更新日時</span>
           <span className="text-sm text-gray-700">{file.modifiedDate ?? 'N/A'}</span>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
@@ -178,9 +188,15 @@ export function FileDetailView({ file }: FileDetailViewProps) {
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <motion.div
+      key={file.path}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="flex flex-col flex-1 overflow-hidden"
+    >
       <FileHeader file={file} />
       {file.isText ? <TextDiffView file={file} /> : <BinaryFileView file={file} />}
-    </div>
+    </motion.div>
   );
 }
