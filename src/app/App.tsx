@@ -75,11 +75,9 @@ interface FolderInputProps {
   iconColor: string;
   borderColor: string;
   isDragOver?: boolean;
-  onDragEnter?: () => void;
-  onDragLeave?: (e: React.DragEvent) => void;
 }
 
-function FolderInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver, onDragEnter, onDragLeave }: FolderInputProps) {
+function FolderInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver }: FolderInputProps) {
   async function browse() {
     const path = await openFolderDialog();
     if (path) onChange(path);
@@ -87,9 +85,6 @@ function FolderInput({ label, value, onChange, gradient, iconColor, borderColor,
   return (
     <div
       className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border shadow-sm transition-all ${isDragOver ? 'border-purple-400 ring-2 ring-purple-400/40 scale-[1.01]' : borderColor}`}
-      onDragOver={(e) => e.preventDefault()}
-      onDragEnter={(e) => { e.preventDefault(); onDragEnter?.(); }}
-      onDragLeave={(e) => onDragLeave?.(e)}
     >
       <FolderOpen size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
       <input
@@ -124,17 +119,27 @@ export default function App() {
   const [dragOverSide, setDragOverSide] = useState<'left' | 'right' | null>(null);
   const dragSideRef = useRef<'left' | 'right' | null>(null);
 
-  // Tauri file-drop: Finderからドロップされたフォルダパスを入力欄に反映
+  // Tauri file-drop: position.x で左右を判定してフォルダパスを入力欄に反映
+  // HTML drag イベントは Finder → Tauri WebView では発火しないため Tauri イベントのみ使用
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     import('@tauri-apps/api/webview').then(({ getCurrentWebview }) => {
       getCurrentWebview().onDragDropEvent((event) => {
-        if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
-          const path = event.payload.paths[0];
-          if (dragSideRef.current === 'left') setLeftPath(path);
-          else if (dragSideRef.current === 'right') setRightPath(path);
-        }
-        if (event.payload.type === 'drop' || event.payload.type === 'leave') {
+        const { type } = event.payload;
+        if (type === 'enter' || type === 'over') {
+          const midX = (window.innerWidth / 2) * window.devicePixelRatio;
+          const side: 'left' | 'right' = event.payload.position.x < midX ? 'left' : 'right';
+          dragSideRef.current = side;
+          setDragOverSide(side);
+        } else if (type === 'drop') {
+          if (event.payload.paths.length > 0) {
+            const path = event.payload.paths[0];
+            if (dragSideRef.current === 'left') setLeftPath(path);
+            else if (dragSideRef.current === 'right') setRightPath(path);
+          }
+          setDragOverSide(null);
+          dragSideRef.current = null;
+        } else if (type === 'leave') {
           setDragOverSide(null);
           dragSideRef.current = null;
         }
@@ -142,24 +147,6 @@ export default function App() {
     });
     return () => { unlisten?.(); };
   }, []);
-
-  function makeDragHandlers(side: 'left' | 'right') {
-    return {
-      onDragEnter: () => {
-        dragSideRef.current = side;
-        setDragOverSide(side);
-      },
-      onDragLeave: (e: React.DragEvent) => {
-        const related = e.relatedTarget as Node | null;
-        if (!related || !(e.currentTarget as Element).contains(related)) {
-          if (dragSideRef.current === side) {
-            dragSideRef.current = null;
-            setDragOverSide(null);
-          }
-        }
-      },
-    };
-  }
 
   const stats = getComparisonStats(tree);
   const visibleTree = filterFileTree(tree, filterStatus, searchQuery);
@@ -225,7 +212,6 @@ export default function App() {
             iconColor="text-purple-500"
             borderColor="border-purple-200"
             isDragOver={dragOverSide === 'left'}
-            {...makeDragHandlers('left')}
           />
           <FolderInput
             label="右側のフォルダパス"
@@ -235,7 +221,6 @@ export default function App() {
             iconColor="text-blue-500"
             borderColor="border-blue-200"
             isDragOver={dragOverSide === 'right'}
-            {...makeDragHandlers('right')}
           />
           <motion.button
             onClick={handleCompare}
