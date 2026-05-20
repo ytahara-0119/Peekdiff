@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, FolderOpen, GitCompare, Filter } from 'lucide-react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -75,19 +75,27 @@ interface FolderInputProps {
   gradient: string;
   iconColor: string;
   borderColor: string;
+  isDragOver?: boolean;
+  onDragEnter?: () => void;
+  onDragLeave?: (e: React.DragEvent) => void;
 }
 
-function FolderInput({ label, value, onChange, gradient, iconColor, borderColor }: FolderInputProps) {
+function FolderInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver, onDragEnter, onDragLeave }: FolderInputProps) {
   async function browse() {
     const path = await openFolderDialog();
     if (path) onChange(path);
   }
   return (
-    <div className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border ${borderColor} shadow-sm`}>
-      <FolderOpen size={18} className={`${iconColor} flex-shrink-0`} />
+    <div
+      className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border shadow-sm transition-all ${isDragOver ? 'border-purple-400 ring-2 ring-purple-400/40 scale-[1.01]' : borderColor}`}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={(e) => { e.preventDefault(); onDragEnter?.(); }}
+      onDragLeave={(e) => onDragLeave?.(e)}
+    >
+      <FolderOpen size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
       <input
         className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400 min-w-0"
-        placeholder={label}
+        placeholder={isDragOver ? 'ここにドロップ' : label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -114,6 +122,45 @@ export default function App() {
   const [rightPath, setRightPath] = useState('');
   const [tree, setTree] = useState<FileNode[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [dragOverSide, setDragOverSide] = useState<'left' | 'right' | null>(null);
+  const dragSideRef = useRef<'left' | 'right' | null>(null);
+
+  // Tauri file-drop: Finderからドロップされたフォルダパスを入力欄に反映
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    import('@tauri-apps/api/webview').then(({ getCurrentWebview }) => {
+      getCurrentWebview().onDragDropEvent((event) => {
+        if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
+          const path = event.payload.paths[0];
+          if (dragSideRef.current === 'left') setLeftPath(path);
+          else if (dragSideRef.current === 'right') setRightPath(path);
+        }
+        if (event.payload.type === 'drop' || event.payload.type === 'leave') {
+          setDragOverSide(null);
+          dragSideRef.current = null;
+        }
+      }).then(fn => { unlisten = fn; });
+    });
+    return () => { unlisten?.(); };
+  }, []);
+
+  function makeDragHandlers(side: 'left' | 'right') {
+    return {
+      onDragEnter: () => {
+        dragSideRef.current = side;
+        setDragOverSide(side);
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        const related = e.relatedTarget as Node | null;
+        if (!related || !(e.currentTarget as Element).contains(related)) {
+          if (dragSideRef.current === side) {
+            dragSideRef.current = null;
+            setDragOverSide(null);
+          }
+        }
+      },
+    };
+  }
 
   const stats = getComparisonStats(tree);
   const visibleTree = filterFileTree(tree, filterStatus, searchQuery);
@@ -176,6 +223,8 @@ export default function App() {
             gradient="from-purple-50 to-pink-50"
             iconColor="text-purple-500"
             borderColor="border-purple-200"
+            isDragOver={dragOverSide === 'left'}
+            {...makeDragHandlers('left')}
           />
           <FolderInput
             label="右側のフォルダパス"
@@ -184,6 +233,8 @@ export default function App() {
             gradient="from-blue-50 to-cyan-50"
             iconColor="text-blue-500"
             borderColor="border-blue-200"
+            isDragOver={dragOverSide === 'right'}
+            {...makeDragHandlers('right')}
           />
           <motion.button
             onClick={handleCompare}
