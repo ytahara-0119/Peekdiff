@@ -14,8 +14,8 @@
         "title": "Peekdiff",
         "width": 1280,
         "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
+        "minWidth": 640,
+        "minHeight": 500,
         "resizable": true
       }
     ],
