@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, FolderOpen, GitCompare, Filter } from 'lucide-react';
+import { Search, FolderOpen, GitCompare, Filter, Moon, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
 import { DirectoryTree } from './components/DirectoryTree';
 import { FileDetailView } from './components/FileDetailView';
-import { AppIcon } from './components/AppIcon';
 import { compareDirectories, openFolderDialog } from './utils/tauriApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -159,8 +158,9 @@ export default function App() {
       <header className="border-b border-purple-200/50 bg-white/80 backdrop-blur-lg px-6 py-4 flex flex-col gap-3">
         {/* Title + icon widget */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex-shrink-0">
-            <AppIcon size={40} />
+          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg flex-shrink-0">
+            <Moon className="w-5 h-5 text-yellow-200 absolute" />
+            <Star className="w-3 h-3 text-yellow-300 absolute top-1 right-1 animate-pulse" />
           </div>
           <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Peekdiff
