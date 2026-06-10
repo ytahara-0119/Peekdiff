@@ -314,6 +314,51 @@ async fn read_file_content(path: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn open_file_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog().file().pick_file(move |f| {
+        let _ = tx.send(f);
+    });
+
+    tauri::async_runtime::spawn_blocking(move || rx.recv())
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+        .map(|f| {
+            f.and_then(|p| {
+                p.into_path()
+                    .ok()
+                    .map(|path| path.to_string_lossy().to_string())
+            })
+        })
+}
+
+#[tauri::command]
+async fn compare_files(left: String, right: String) -> Result<FileNode, String> {
+    let left_path = PathBuf::from(&left);
+    let right_path = PathBuf::from(&right);
+
+    if !left_path.is_file() {
+        return Err(format!("Left path is not a file: {}", left_path.display()));
+    }
+    if !right_path.is_file() {
+        return Err(format!("Right path is not a file: {}", right_path.display()));
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let name = left_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "file".to_string());
+        Ok(compare_file(&name, Some(&left_path), Some(&right_path), &name))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ── Entry ─────────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -332,6 +377,8 @@ pub fn run() {
             compare_directories,
             open_folder_dialog,
             read_file_content,
+            open_file_dialog,
+            compare_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

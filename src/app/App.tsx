@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, FolderOpen, GitCompare, Filter, Moon, Star } from 'lucide-react';
+import { Search, FolderOpen, FileText, GitCompare, Filter, Moon, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
 import { DirectoryTree } from './components/DirectoryTree';
 import { FileDetailView } from './components/FileDetailView';
-import { compareDirectories, openFolderDialog } from './utils/tauriApi';
+import { compareDirectories, openFolderDialog, compareFiles, openFileDialog } from './utils/tauriApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ function StatBadge({ label, count, gradient }: { label: string; count: number; g
   );
 }
 
-interface FolderInputProps {
+interface PathInputProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -75,18 +75,20 @@ interface FolderInputProps {
   iconColor: string;
   borderColor: string;
   isDragOver?: boolean;
+  mode: 'directory' | 'file';
 }
 
-function FolderInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver }: FolderInputProps) {
+function PathInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver, mode }: PathInputProps) {
   async function browse() {
-    const path = await openFolderDialog();
+    const path = mode === 'file' ? await openFileDialog() : await openFolderDialog();
     if (path) onChange(path);
   }
+  const Icon = mode === 'file' ? FileText : FolderOpen;
   return (
     <div
       className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border shadow-sm transition-all ${isDragOver ? 'border-purple-400 ring-2 ring-purple-400/40 scale-[1.01]' : borderColor}`}
     >
-      <FolderOpen size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
+      <Icon size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
       <input
         className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400 min-w-0"
         placeholder={isDragOver ? 'ここにドロップ' : label}
@@ -96,7 +98,7 @@ function FolderInput({ label, value, onChange, gradient, iconColor, borderColor,
       <button
         onClick={browse}
         className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 px-2 py-0.5 rounded hover:bg-white/50"
-        title="フォルダを選択"
+        title={mode === 'file' ? 'ファイルを選択' : 'フォルダを選択'}
       >
         選択
       </button>
@@ -107,6 +109,7 @@ function FolderInput({ label, value, onChange, gradient, iconColor, borderColor,
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [mode, setMode] = useState<'directory' | 'file'>('directory');
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [filterStatus, setFilterStatus] = useState<CompareStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,6 +118,7 @@ export default function App() {
   const [leftPath, setLeftPath] = useState('');
   const [rightPath, setRightPath] = useState('');
   const [tree, setTree] = useState<FileNode[]>([]);
+  const [fileResult, setFileResult] = useState<FileNode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<'left' | 'right' | null>(null);
   const dragSideRef = useRef<'left' | 'right' | null>(null);
@@ -156,10 +160,23 @@ export default function App() {
 
   // Confetti on comparison complete
   useEffect(() => {
-    if (progress === 100 && !isComparing && tree.length > 0) {
+    const hasResult = mode === 'file' ? fileResult !== null : tree.length > 0;
+    if (progress === 100 && !isComparing && hasResult) {
       triggerCelebration();
     }
-  }, [progress, isComparing, tree.length]);
+  }, [progress, isComparing, tree.length, fileResult, mode]);
+
+  function handleModeChange(next: 'directory' | 'file') {
+    if (next === mode) return;
+    setMode(next);
+    setLeftPath('');
+    setRightPath('');
+    setTree([]);
+    setFileResult(null);
+    setSelectedFile(null);
+    setError(null);
+    setProgress(0);
+  }
 
   async function handleCompare() {
     if (isComparing || !leftPath || !rightPath) return;
@@ -167,6 +184,7 @@ export default function App() {
     setProgress(0);
     setError(null);
     setSelectedFile(null);
+    setFileResult(null);
 
     let step = 0;
     const interval = setInterval(() => {
@@ -175,11 +193,15 @@ export default function App() {
     }, 100);
 
     try {
-      const result = await compareDirectories(leftPath, rightPath);
-      setTree(result);
+      if (mode === 'file') {
+        const result = await compareFiles(leftPath, rightPath);
+        setFileResult(result);
+      } else {
+        const result = await compareDirectories(leftPath, rightPath);
+        setTree(result);
+      }
       setProgress(100);
       clearInterval(interval);
-      // isComparing=false を先に更新し、progress=100 のまま confetti を発火させる
       setTimeout(() => setIsComparing(false), 300);
       setTimeout(() => setProgress(0), 800);
     } catch (e) {
@@ -194,8 +216,8 @@ export default function App() {
     <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       {/* Header */}
       <header className="border-b border-purple-200/50 bg-white/80 backdrop-blur-lg px-6 py-4 flex flex-col gap-3">
-        {/* Title + icon widget */}
-        <div className="flex items-center gap-3">
+        {/* Title + icon widget + mode tabs */}
+        <div className="flex items-center gap-4">
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg flex-shrink-0">
             <Moon className="w-5 h-5 text-yellow-200 absolute" />
             <Star className="w-3 h-3 text-yellow-300 absolute top-1 right-1 animate-pulse" />
@@ -203,27 +225,46 @@ export default function App() {
           <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Peekdiff
           </span>
+          {/* Mode tabs */}
+          <div className="flex items-center gap-1 bg-purple-100/60 rounded-lg p-1 ml-2">
+            <button
+              onClick={() => handleModeChange('directory')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'directory' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <FolderOpen size={13} />
+              フォルダ比較
+            </button>
+            <button
+              onClick={() => handleModeChange('file')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'file' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <FileText size={13} />
+              ファイル比較
+            </button>
+          </div>
         </div>
 
-        {/* Folder inputs + compare button */}
+        {/* Path inputs + compare button */}
         <div className="flex items-center gap-3">
-          <FolderInput
-            label="左側のフォルダパス"
+          <PathInput
+            label={mode === 'file' ? '左側のファイルパス' : '左側のフォルダパス'}
             value={leftPath}
             onChange={setLeftPath}
             gradient="from-purple-50 to-pink-50"
             iconColor="text-purple-500"
             borderColor="border-purple-200"
             isDragOver={dragOverSide === 'left'}
+            mode={mode}
           />
-          <FolderInput
-            label="右側のフォルダパス"
+          <PathInput
+            label={mode === 'file' ? '右側のファイルパス' : '右側のフォルダパス'}
             value={rightPath}
             onChange={setRightPath}
             gradient="from-blue-50 to-cyan-50"
             iconColor="text-blue-500"
             borderColor="border-blue-200"
             isDragOver={dragOverSide === 'right'}
+            mode={mode}
           />
           <motion.button
             onClick={handleCompare}
@@ -251,35 +292,37 @@ export default function App() {
           <div className="text-xs text-red-500 px-1">{error}</div>
         )}
 
-        {/* Search + filter */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
-            <Search size={16} className="text-purple-500 flex-shrink-0" />
-            <input
-              className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
-              placeholder="ファイル名で検索..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Search + filter (directory mode only) */}
+        {mode === 'directory' && (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
+              <Search size={16} className="text-purple-500 flex-shrink-0" />
+              <input
+                className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
+                placeholder="ファイル名で検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
+              <Filter size={16} className="text-purple-500 flex-shrink-0" />
+              <select
+                className="bg-transparent text-sm text-gray-700 outline-none cursor-pointer"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as CompareStatus | 'all')}
+              >
+                <option value="all">すべて</option>
+                <option value="added">追加</option>
+                <option value="deleted">削除</option>
+                <option value="modified">変更</option>
+                <option value="identical">同一</option>
+              </select>
+            </div>
           </div>
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
-            <Filter size={16} className="text-purple-500 flex-shrink-0" />
-            <select
-              className="bg-transparent text-sm text-gray-700 outline-none cursor-pointer"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as CompareStatus | 'all')}
-            >
-              <option value="all">すべて</option>
-              <option value="added">追加</option>
-              <option value="deleted">削除</option>
-              <option value="modified">変更</option>
-              <option value="identical">同一</option>
-            </select>
-          </div>
-        </div>
+        )}
 
-        {/* Stats badges */}
-        {tree.length > 0 && (
+        {/* Stats badges (directory mode only) */}
+        {mode === 'directory' && tree.length > 0 && (
           <div className="flex items-center gap-3">
             <StatBadge label="+" count={stats.added} gradient="from-green-500 to-emerald-500" />
             <StatBadge label="-" count={stats.deleted} gradient="from-red-500 to-rose-500" />
@@ -291,33 +334,52 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex-1 flex gap-1 overflow-hidden p-1">
-        {/* Left pane */}
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-tr-2xl overflow-y-auto overflow-x-hidden shadow-xl border-r border-purple-200/50"
-        >
-          {tree.length === 0 && !isComparing ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
-              左右のフォルダを選択して「比較」を押してください
-            </div>
-          ) : (
-            <DirectoryTree
-              nodes={visibleTree}
-              onSelectFile={setSelectedFile}
-              selectedFile={selectedFile}
-            />
-          )}
-        </motion.div>
+        {mode === 'directory' ? (
+          <>
+            {/* Left pane: directory tree */}
+            <motion.div
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              className="w-96 flex-shrink-0 bg-white/70 backdrop-blur-lg rounded-tr-2xl overflow-y-auto overflow-x-hidden shadow-xl border-r border-purple-200/50"
+            >
+              {tree.length === 0 && !isComparing ? (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
+                  左右のフォルダを選択して「比較」を押してください
+                </div>
+              ) : (
+                <DirectoryTree
+                  nodes={visibleTree}
+                  onSelectFile={setSelectedFile}
+                  selectedFile={selectedFile}
+                />
+              )}
+            </motion.div>
 
-        {/* Right pane */}
-        <motion.div
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="flex-1 bg-white/50 backdrop-blur-lg rounded-tl-2xl overflow-hidden shadow-xl flex flex-col"
-        >
-          <FileDetailView file={selectedFile} />
-        </motion.div>
+            {/* Right pane: file diff */}
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              className="flex-1 bg-white/50 backdrop-blur-lg rounded-tl-2xl overflow-hidden shadow-xl flex flex-col"
+            >
+              <FileDetailView file={selectedFile} />
+            </motion.div>
+          </>
+        ) : (
+          /* File comparison mode: full-width diff */
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex-1 bg-white/50 backdrop-blur-lg rounded-2xl overflow-hidden shadow-xl flex flex-col"
+          >
+            {fileResult ? (
+              <FileDetailView file={fileResult} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8 text-center">
+                左右のファイルを選択して「比較」を押してください
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
     </div>
   );
