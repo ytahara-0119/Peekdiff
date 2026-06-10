@@ -60,18 +60,34 @@ fn unix_to_datetime(secs: u64) -> String {
     format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s)
 }
 
-fn is_text_file(name: &str) -> bool {
-    let path = Path::new(name);
-    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+fn is_text_by_content(path: &Path) -> bool {
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut buf = [0u8; 8192];
+    let n = f.read(&mut buf).unwrap_or(0);
+    // empty file counts as text; any null byte → binary
+    n == 0 || !buf[..n].contains(&0u8)
+}
+
+fn is_text_file(name: &str, path: Option<&Path>) -> bool {
+    // ① extension whitelist
+    if let Some(ext) = Path::new(name).extension().and_then(|e| e.to_str()) {
         if TEXT_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
             return true;
         }
     }
-    // dotfiles without extension (.gitignore, .env, etc.)
+    // ② dotfiles without extension (.gitignore, .env, etc.)
     if name.starts_with('.') && !name[1..].contains('.') {
         return true;
     }
-    matches!(name, "Makefile" | "Dockerfile" | "Procfile")
+    // ③ known text filenames without extension
+    if matches!(name, "Makefile" | "Dockerfile" | "Procfile") {
+        return true;
+    }
+    // ④ fallback: content inspection for unknown extensions
+    path.map(is_text_by_content).unwrap_or(false)
 }
 
 fn hash_file(path: &Path) -> Option<String> {
@@ -115,7 +131,7 @@ fn compare_file(
     right: Option<&Path>,
     rel: &str,
 ) -> FileNode {
-    let text = is_text_file(name);
+    let text = is_text_file(name, left.or(right));
 
     match (left, right) {
         (Some(l), None) => {
