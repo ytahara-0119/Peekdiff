@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, FolderOpen, FileText, GitCompare, Filter, Moon, Star } from 'lucide-react';
+import { Search, FolderOpen, FileText, GitCompare, Filter, Moon, Star, FolderTree } from 'lucide-react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
@@ -169,6 +169,7 @@ export default function App() {
   const [fileResult, setFileResult] = useState<FileNode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<'left' | 'right' | null>(null);
+  const [recursive, setRecursive] = useState(true);
   const dragSideRef = useRef<'left' | 'right' | null>(null);
   const handlePathChangeRef = useRef<(side: 'left' | 'right', path: string) => Promise<void>>();
 
@@ -274,7 +275,7 @@ export default function App() {
         const result = await compareFiles(leftPath, rightPath);
         setFileResult(result);
       } else {
-        const result = await compareDirectories(leftPath, rightPath);
+        const result = await compareDirectories(leftPath, rightPath, recursive);
         setTree(result);
       }
       setProgress(100);
@@ -354,7 +355,7 @@ export default function App() {
           <div className="text-xs text-red-500 px-1">{error}</div>
         )}
 
-        {/* Search + filter (directory mode only) */}
+        {/* Search + filter + recursive toggle (directory mode only) */}
         {mode === 'directory' && (
           <div className="flex items-center gap-3">
             <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-white/60 rounded-xl border border-purple-200/50 shadow-sm backdrop-blur-sm">
@@ -380,6 +381,20 @@ export default function App() {
                 <option value="identical">同一</option>
               </select>
             </div>
+            <motion.button
+              onClick={() => setRecursive(r => !r)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-medium transition-all shadow-sm backdrop-blur-sm ${
+                recursive
+                  ? 'bg-purple-100 text-purple-700 border-purple-300'
+                  : 'bg-white/60 text-gray-400 border-gray-200'
+              }`}
+              title={recursive ? 'サブフォルダを含む（クリックで除外）' : 'サブフォルダを除外中（クリックで含む）'}
+            >
+              <FolderTree size={14} />
+              サブフォルダ
+            </motion.button>
           </div>
         )}
 
