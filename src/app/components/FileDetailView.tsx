@@ -1,61 +1,11 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { HardDrive, Hash, Calendar } from 'lucide-react';
 import { FileNode, DiffLine, CompareStatus } from '../types';
+import { computeDiff } from '../utils/tauriApi';
 
 interface FileDetailViewProps {
   file: FileNode | null;
-}
-
-function generateDiffLines(left: string, right: string): DiffLine[] {
-  const leftLines = left === '' ? [] : left.split('\n');
-  const rightLines = right === '' ? [] : right.split('\n');
-  const result: DiffLine[] = [];
-  let l = 0;
-  let r = 0;
-  let leftNum = 1;
-  let rightNum = 1;
-
-  while (l < leftLines.length || r < rightLines.length) {
-    if (l >= leftLines.length) {
-      result.push({ type: 'added', rightLineNumber: rightNum++, content: rightLines[r++] });
-      continue;
-    }
-    if (r >= rightLines.length) {
-      result.push({ type: 'deleted', leftLineNumber: leftNum++, content: leftLines[l++] });
-      continue;
-    }
-    if (leftLines[l] === rightLines[r]) {
-      result.push({ type: 'unchanged', leftLineNumber: leftNum++, rightLineNumber: rightNum++, content: leftLines[l] });
-      l++;
-      r++;
-    } else {
-      // 5-line lookahead
-      let matchLeft = -1;
-      let matchRight = -1;
-      outer: for (let dl = 0; dl <= 5; dl++) {
-        for (let dr = 0; dr <= 5; dr++) {
-          if (dl === 0 && dr === 0) continue;
-          if (l + dl < leftLines.length && r + dr < rightLines.length && leftLines[l + dl] === rightLines[r + dr]) {
-            matchLeft = dl;
-            matchRight = dr;
-            break outer;
-          }
-        }
-      }
-      if (matchLeft === -1) {
-        result.push({ type: 'deleted', leftLineNumber: leftNum++, content: leftLines[l++] });
-        result.push({ type: 'added', rightLineNumber: rightNum++, content: rightLines[r++] });
-      } else {
-        for (let i = 0; i < matchLeft; i++) {
-          result.push({ type: 'deleted', leftLineNumber: leftNum++, content: leftLines[l++] });
-        }
-        for (let i = 0; i < matchRight; i++) {
-          result.push({ type: 'added', rightLineNumber: rightNum++, content: rightLines[r++] });
-        }
-      }
-    }
-  }
-  return result;
 }
 
 function statusBadge(status: CompareStatus) {
@@ -85,7 +35,23 @@ function FileHeader({ file }: { file: FileNode }) {
 }
 
 function TextDiffView({ file }: { file: FileNode }) {
-  const lines = generateDiffLines(file.leftContent ?? '', file.rightContent ?? '');
+  const [lines, setLines] = useState<DiffLine[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    computeDiff(file.leftContent ?? '', file.rightContent ?? '')
+      .then(setLines)
+      .finally(() => setLoading(false));
+  }, [file.leftContent, file.rightContent]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+        差分を計算中...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
