@@ -213,7 +213,7 @@ fn compare_file(
     }
 }
 
-fn compare_entries(left_dir: Option<&Path>, right_dir: Option<&Path>, rel: &str) -> Vec<FileNode> {
+fn compare_entries(left_dir: Option<&Path>, right_dir: Option<&Path>, rel: &str, recursive: bool) -> Vec<FileNode> {
     // Collect all names from both sides, sorted
     let mut all: BTreeMap<String, (Option<PathBuf>, Option<PathBuf>)> = BTreeMap::new();
 
@@ -237,20 +237,16 @@ fn compare_entries(left_dir: Option<&Path>, right_dir: Option<&Path>, rel: &str)
     }
 
     all.into_iter()
-        .map(|(name, (lp, rp))| {
+        .filter_map(|(name, (lp, rp))| {
             let child_rel = format!("{}/{}", rel, name);
             let is_dir = lp.as_deref().map(|p| p.is_dir())
                 .or_else(|| rp.as_deref().map(|p| p.is_dir()))
                 .unwrap_or(false);
             if is_dir {
-                compare_directory(
-                    &name,
-                    lp.as_deref(),
-                    rp.as_deref(),
-                    &child_rel,
-                )
+                if !recursive { return None; }
+                Some(compare_directory(&name, lp.as_deref(), rp.as_deref(), &child_rel, recursive))
             } else {
-                compare_file(&name, lp.as_deref(), rp.as_deref(), &child_rel)
+                Some(compare_file(&name, lp.as_deref(), rp.as_deref(), &child_rel))
             }
         })
         .collect()
@@ -261,8 +257,9 @@ fn compare_directory(
     left: Option<&Path>,
     right: Option<&Path>,
     rel: &str,
+    recursive: bool,
 ) -> FileNode {
-    let children = compare_entries(left, right, rel);
+    let children = compare_entries(left, right, rel, recursive);
     let status = match (left, right) {
         (None, _) => "added",
         (_, None) => "deleted",
@@ -289,24 +286,24 @@ fn compare_directory(
     }
 }
 
-fn compare_dirs_impl(left: &Path, right: &Path) -> Result<Vec<FileNode>, String> {
+fn compare_dirs_impl(left: &Path, right: &Path, recursive: bool) -> Result<Vec<FileNode>, String> {
     if !left.is_dir() {
         return Err(format!("Left path is not a directory: {}", left.display()));
     }
     if !right.is_dir() {
         return Err(format!("Right path is not a directory: {}", right.display()));
     }
-    Ok(compare_entries(Some(left), Some(right), ""))
+    Ok(compare_entries(Some(left), Some(right), "", recursive))
 }
 
 // ── Tauri Commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn compare_directories(left: String, right: String) -> Result<Vec<FileNode>, String> {
+async fn compare_directories(left: String, right: String, recursive: bool) -> Result<Vec<FileNode>, String> {
     let left_path = PathBuf::from(left);
     let right_path = PathBuf::from(right);
     tauri::async_runtime::spawn_blocking(move || {
-        compare_dirs_impl(&left_path, &right_path)
+        compare_dirs_impl(&left_path, &right_path, recursive)
     })
     .await
     .map_err(|e| e.to_string())?
