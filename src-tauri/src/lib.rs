@@ -5,6 +5,7 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use similar::{ChangeTag, TextDiff};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,18 @@ const TEXT_EXTENSIONS: &[&str] = &[
 ];
 
 const MAX_TEXT_BYTES: u64 = 1 * 1024 * 1024; // 1 MB
+
+// ── DiffLine ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffLine {
+    #[serde(rename = "type")]
+    pub line_type: String,
+    pub left_line_number: Option<u32>,
+    pub right_line_number: Option<u32>,
+    pub content: String,
+}
 
 // ── FileNode ──────────────────────────────────────────────────────────────────
 
@@ -353,6 +366,55 @@ async fn open_file_dialog(app: tauri::AppHandle) -> Result<Option<String>, Strin
 }
 
 #[tauri::command]
+async fn compute_diff(
+    left_content: String,
+    right_content: String,
+) -> Result<Vec<DiffLine>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let diff = TextDiff::from_lines(&left_content, &right_content);
+        let mut result = Vec::new();
+        let mut left_num = 1u32;
+        let mut right_num = 1u32;
+
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                ChangeTag::Delete => {
+                    result.push(DiffLine {
+                        line_type: "deleted".to_string(),
+                        left_line_number: Some(left_num),
+                        right_line_number: None,
+                        content: change.value().trim_end_matches('\n').to_string(),
+                    });
+                    left_num += 1;
+                }
+                ChangeTag::Insert => {
+                    result.push(DiffLine {
+                        line_type: "added".to_string(),
+                        left_line_number: None,
+                        right_line_number: Some(right_num),
+                        content: change.value().trim_end_matches('\n').to_string(),
+                    });
+                    right_num += 1;
+                }
+                ChangeTag::Equal => {
+                    result.push(DiffLine {
+                        line_type: "unchanged".to_string(),
+                        left_line_number: Some(left_num),
+                        right_line_number: Some(right_num),
+                        content: change.value().trim_end_matches('\n').to_string(),
+                    });
+                    left_num += 1;
+                    right_num += 1;
+                }
+            }
+        }
+        Ok(result)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn compare_files(left: String, right: String) -> Result<FileNode, String> {
     let left_path = PathBuf::from(&left);
     let right_path = PathBuf::from(&right);
@@ -395,6 +457,7 @@ pub fn run() {
             read_file_content,
             open_file_dialog,
             compare_files,
+            compute_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
