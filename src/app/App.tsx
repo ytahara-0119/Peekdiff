@@ -56,6 +56,49 @@ function triggerCelebration() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function ComparisonSummary({ stats }: { stats: Record<CompareStatus, number> }) {
+  const changed = stats.added + stats.deleted + stats.modified;
+  const total = changed + stats.identical;
+  const cards: { label: string; count: number; symbol: string; gradient: string; bg: string; border: string }[] = [
+    { label: '追加', count: stats.added,    symbol: '+', gradient: 'from-green-500 to-emerald-500',  bg: 'bg-green-50',  border: 'border-green-200'  },
+    { label: '削除', count: stats.deleted,  symbol: '-', gradient: 'from-red-500 to-rose-500',       bg: 'bg-red-50',    border: 'border-red-200'    },
+    { label: '変更', count: stats.modified, symbol: '~', gradient: 'from-yellow-500 to-amber-500',   bg: 'bg-yellow-50', border: 'border-yellow-200' },
+    { label: '同一', count: stats.identical,symbol: '=', gradient: 'from-gray-400 to-gray-500',      bg: 'bg-gray-50',   border: 'border-gray-200'   },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center h-full gap-8 p-12"
+    >
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-700 mb-1">比較完了</h2>
+        <p className="text-sm text-gray-400">
+          全 {total} ファイル中、{changed} 件に変更があります
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-4 w-full max-w-xl">
+        {cards.map(({ label, count, symbol, gradient, bg, border }) => (
+          <motion.div
+            key={label}
+            whileHover={{ scale: 1.05 }}
+            className={`flex flex-col items-center gap-2 p-5 rounded-2xl border ${bg} ${border} shadow-sm`}
+          >
+            <span className={`text-3xl font-bold bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+              {symbol}{count}
+            </span>
+            <span className="text-xs text-gray-500">{label}</span>
+          </motion.div>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400">
+        ← ツリーからファイルを選択すると差分が表示されます
+      </p>
+    </motion.div>
+  );
+}
+
 function StatBadge({ label, count, gradient }: { label: string; count: number; gradient: string }) {
   return (
     <motion.span
@@ -355,13 +398,16 @@ export default function App() {
               )}
             </motion.div>
 
-            {/* Right pane: file diff */}
+            {/* Right pane: summary or file diff */}
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               className="flex-1 bg-white/50 backdrop-blur-lg rounded-tl-2xl overflow-hidden shadow-xl flex flex-col"
             >
-              <FileDetailView file={selectedFile} />
+              {tree.length > 0 && !selectedFile
+                ? <ComparisonSummary stats={stats} />
+                : <FileDetailView file={selectedFile} />
+              }
             </motion.div>
           </>
         ) : (
