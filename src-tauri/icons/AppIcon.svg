@@ -14,16 +14,16 @@
     <!-- rounded-xl background -->
     <rect width="512" height="512" rx="115" fill="url(#bg)"/>
 
-    <!-- Moon (lucide): centered 200×200 -->
-    <!-- center: (256-100, 256-100) = (156, 156) -->
-    <svg x="156" y="156" width="200" height="200" viewBox="0 0 24 24" fill="none">
+    <!-- Moon (lucide): centered 230×230 (+15% from 200×200) -->
+    <!-- center: (512-230)/2 = 141 -->
+    <svg x="141" y="141" width="230" height="230" viewBox="0 0 24 24" fill="none">
       <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"
             stroke="#FDE68A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
 
-    <!-- Star (lucide): top-right, 110×110 -->
-    <!-- left = 512-51-110 = 351 -->
-    <svg x="351" y="51" width="110" height="110" viewBox="0 0 24 24" fill="none">
+    <!-- Star (lucide): top-right, 127×127 (+15% from 110×110) -->
+    <!-- right margin 51px: 512-51-127 = 334 -->
+    <svg x="334" y="51" width="127" height="127" viewBox="0 0 24 24" fill="none">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
                stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
