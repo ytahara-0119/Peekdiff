@@ -366,6 +366,18 @@ async fn open_file_dialog(app: tauri::AppHandle) -> Result<Option<String>, Strin
 }
 
 #[tauri::command]
+async fn get_path_type(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    if p.is_dir() {
+        Ok("directory".to_string())
+    } else if p.is_file() {
+        Ok("file".to_string())
+    } else {
+        Ok("not_found".to_string())
+    }
+}
+
+#[tauri::command]
 async fn compute_diff(
     left_content: String,
     right_content: String,
@@ -458,6 +470,7 @@ pub fn run() {
             open_file_dialog,
             compare_files,
             compute_diff,
+            get_path_type,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

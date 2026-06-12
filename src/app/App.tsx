@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti';
 import { FileNode, CompareStatus } from './types';
 import { DirectoryTree } from './components/DirectoryTree';
 import { FileDetailView } from './components/FileDetailView';
-import { compareDirectories, openFolderDialog, compareFiles, openFileDialog } from './utils/tauriApi';
+import { compareDirectories, openFolderDialog, compareFiles, openFileDialog, getPathType } from './utils/tauriApi';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,37 +114,42 @@ interface PathInputProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  onBrowseFolder: () => void;
+  onBrowseFile: () => void;
   gradient: string;
   iconColor: string;
   borderColor: string;
   isDragOver?: boolean;
-  mode: 'directory' | 'file';
 }
 
-function PathInput({ label, value, onChange, gradient, iconColor, borderColor, isDragOver, mode }: PathInputProps) {
-  async function browse() {
-    const path = mode === 'file' ? await openFileDialog() : await openFolderDialog();
-    if (path) onChange(path);
-  }
-  const Icon = mode === 'file' ? FileText : FolderOpen;
+function PathInput({ label, value, onChange, onBrowseFolder, onBrowseFile, gradient, iconColor, borderColor, isDragOver }: PathInputProps) {
   return (
     <div
       className={`flex-1 flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${gradient} rounded-xl border shadow-sm transition-all ${isDragOver ? 'border-purple-400 ring-2 ring-purple-400/40 scale-[1.01]' : borderColor}`}
     >
-      <Icon size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
+      <FolderOpen size={18} className={`${isDragOver ? 'text-purple-500' : iconColor} flex-shrink-0 transition-colors`} />
       <input
         className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400 min-w-0"
         placeholder={isDragOver ? 'ここにドロップ' : label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      <button
-        onClick={browse}
-        className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 px-2 py-0.5 rounded hover:bg-white/50"
-        title={mode === 'file' ? 'ファイルを選択' : 'フォルダを選択'}
-      >
-        選択
-      </button>
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <button
+          onClick={onBrowseFolder}
+          className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-white/50"
+          title="フォルダを選択"
+        >
+          <FolderOpen size={13} />
+        </button>
+        <button
+          onClick={onBrowseFile}
+          className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-white/50"
+          title="ファイルを選択"
+        >
+          <FileText size={13} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -165,6 +170,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [dragOverSide, setDragOverSide] = useState<'left' | 'right' | null>(null);
   const dragSideRef = useRef<'left' | 'right' | null>(null);
+  const handlePathChangeRef = useRef<(side: 'left' | 'right', path: string) => Promise<void>>();
 
   // Tauri file-drop: position.x で左右を判定してフォルダパスを入力欄に反映
   // HTML drag イベントは Finder → Tauri WebView では発火しないため Tauri イベントのみ使用
@@ -184,8 +190,7 @@ export default function App() {
             // dragSideRef に依存せず position.x から直接判定（leave が drop より先に発火する macOS の挙動対策）
             const midX = window.innerWidth / 2;
             const side: 'left' | 'right' = event.payload.position.x < midX ? 'left' : 'right';
-            if (side === 'left') setLeftPath(path);
-            else setRightPath(path);
+            void handlePathChangeRef.current?.(side, path);
           }
           setDragOverSide(null);
           dragSideRef.current = null;
@@ -209,20 +214,49 @@ export default function App() {
     }
   }, [progress, isComparing, tree.length, fileResult, mode]);
 
-  function handleModeChange(next: 'directory' | 'file') {
-    if (next === mode) return;
-    setMode(next);
-    setLeftPath('');
-    setRightPath('');
-    setTree([]);
-    setFileResult(null);
-    setSelectedFile(null);
+  async function handlePathChange(side: 'left' | 'right', path: string) {
     setError(null);
-    setProgress(0);
+    if (side === 'left') setLeftPath(path);
+    else setRightPath(path);
+    if (!path) return;
+
+    const type = await getPathType(path);
+    if (type === 'not_found') return;
+
+    const otherPath = side === 'left' ? rightPath : leftPath;
+    if (otherPath) {
+      const otherType = await getPathType(otherPath);
+      if (otherType !== 'not_found' && otherType !== type) {
+        setError('比較対象が異なります');
+        return;
+      }
+    }
+
+    if (mode !== type) {
+      setMode(type as 'directory' | 'file');
+      setTree([]);
+      setFileResult(null);
+      setSelectedFile(null);
+      setProgress(0);
+    }
   }
+  handlePathChangeRef.current = handlePathChange;
 
   async function handleCompare() {
     if (isComparing || !leftPath || !rightPath) return;
+
+    const [lt, rt] = await Promise.all([getPathType(leftPath), getPathType(rightPath)]);
+    if (lt === 'not_found' || rt === 'not_found') {
+      setError('パスが見つかりません');
+      return;
+    }
+    if (lt !== rt) {
+      setError('比較対象が異なります');
+      return;
+    }
+    const effectiveMode = lt as 'directory' | 'file';
+    setMode(effectiveMode);
+
     setIsComparing(true);
     setProgress(0);
     setError(null);
@@ -236,7 +270,7 @@ export default function App() {
     }, 100);
 
     try {
-      if (mode === 'file') {
+      if (effectiveMode === 'file') {
         const result = await compareFiles(leftPath, rightPath);
         setFileResult(result);
       } else {
@@ -268,46 +302,31 @@ export default function App() {
           <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Peekdiff
           </span>
-          {/* Mode tabs */}
-          <div className="flex items-center gap-1 bg-purple-100/60 rounded-lg p-1 ml-2">
-            <button
-              onClick={() => handleModeChange('directory')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'directory' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <FolderOpen size={13} />
-              フォルダ比較
-            </button>
-            <button
-              onClick={() => handleModeChange('file')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'file' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <FileText size={13} />
-              ファイル比較
-            </button>
-          </div>
         </div>
 
         {/* Path inputs + compare button */}
         <div className="flex items-center gap-3">
           <PathInput
-            label={mode === 'file' ? '左側のファイルパス' : '左側のフォルダパス'}
+            label="左側のパス"
             value={leftPath}
             onChange={setLeftPath}
+            onBrowseFolder={async () => { const p = await openFolderDialog(); if (p) handlePathChange('left', p); }}
+            onBrowseFile={async () => { const p = await openFileDialog(); if (p) handlePathChange('left', p); }}
             gradient="from-purple-50 to-pink-50"
             iconColor="text-purple-500"
             borderColor="border-purple-200"
             isDragOver={dragOverSide === 'left'}
-            mode={mode}
           />
           <PathInput
-            label={mode === 'file' ? '右側のファイルパス' : '右側のフォルダパス'}
+            label="右側のパス"
             value={rightPath}
             onChange={setRightPath}
+            onBrowseFolder={async () => { const p = await openFolderDialog(); if (p) handlePathChange('right', p); }}
+            onBrowseFile={async () => { const p = await openFileDialog(); if (p) handlePathChange('right', p); }}
             gradient="from-blue-50 to-cyan-50"
             iconColor="text-blue-500"
             borderColor="border-blue-200"
             isDragOver={dragOverSide === 'right'}
-            mode={mode}
           />
           <motion.button
             onClick={handleCompare}
