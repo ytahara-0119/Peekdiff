@@ -17,6 +17,10 @@ export async function compareFiles(left: string, right: string): Promise<FileNod
   return invoke<FileNode>('compare_files', { left, right });
 }
 
+export async function getPathType(path: string): Promise<'directory' | 'file' | 'not_found'> {
+  return invoke<'directory' | 'file' | 'not_found'>('get_path_type', { path });
+}
+
 export async function computeDiff(
   leftContent: string,
   rightContent: string,
